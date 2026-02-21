@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0f0f12;
+  --surface: #18181c;
+  --border: #2a2a30;
+  --text: #e4e4e7;
+  --muted: #71717a;
+  --progressive: #22c55e;
+  --conservative: #3b82f6;
+  --devil: #a855f7;
+  --bias: #f59e0b;
+  --fact: #06b6d4;
+  --synthesizer: #ec4899;
+  --pragmatist: #14b8a6;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
