@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Polarity AI</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        width: 320px;
+        margin: 0;
+        padding: 16px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0 0 12px;
+        font-weight: 700;
+      }
+      .muted {
+        color: #666;
+        font-size: 12px;
+        margin-bottom: 12px;
+        line-height: 1.4;
+      }
+      button {
+        width: 100%;
+        padding: 10px;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        background: #1a1a1a;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .results {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #e5e5e5;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 8px;
+      }
+      .label {
+        color: #666;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .value {
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .bar {
+        height: 8px;
+        border-radius: 4px;
+        background: #eee;
+        margin-top: 4px;
+        overflow: hidden;
+      }
+      .bar > div {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+      .err {
+        color: #b91c1c;
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      a {
+        color: #2563eb;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Polarity AI</h1>
+    <p class="muted">
+      Real-time bias and reliability for the active tab’s URL. Configure your deployment URL in extension options if needed.
+    </p>
+    <button id="analyze" type="button">Analyze this page</button>
+    <div id="outlet" class="muted" style="margin-top: 10px; display: none"></div>
+    <div id="results" class="results" style="display: none">
+      <div class="row">
+        <span class="label">Reliability</span>
+        <span id="relValue" class="value">—</span>
+      </div>
+      <div class="bar"><div id="relBar" style="width: 0%; background: #22c55e"></div></div>
+      <div class="row" style="margin-top: 12px">
+        <span class="label">Bias</span>
+        <span id="biasValue" class="value">—</span>
+      </div>
+      <div class="muted" id="conf" style="margin-top: 4px"></div>
+    </div>
+    <p id="error" class="err" style="display: none"></p>
+    <p style="margin-top: 12px"><a id="opts" href="#">Options</a></p>
+    <script src="popup.js"></script>
+  </body>
+</html>

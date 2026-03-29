@@ -1,29 +1,12 @@
 {
-  "name": "factcheck",
-  "version": "0.1.0",
+  "name": "polarity",
   "private": true,
+  "description": "Polarity monorepo — matches github.com/pthaps/polarity-v2 layout",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
-    "cheerio": "^1.0.0",
-    "next": "14.2.18",
-    "openai": "^4.104.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "14.2.18",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.15",
-    "typescript": "^5.0.0"
+    "dev": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "install:all": "npm install --prefix frontend --legacy-peer-deps"
   }
 }

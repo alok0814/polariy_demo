@@ -1,46 +1,43 @@
-# FactCheck Debate
+# Polarity
 
-A web app that analyzes political news from multiple perspectives. Enter a news URL and a **Host** plus **7 panel characters** debate the article and produce a **Credibility Score**, **Bias Meter**, and a **final summary**.
+Layout aligned with [pthaps/polarity-v2](https://github.com/pthaps/polarity-v2): **`frontend/`**, **`backend/`**, **`extension/`**, **`docs/`**.
 
-## Panel
+## Repository layout
 
-- **Host** — Facilitator; keeps the discussion on topic.
-- **Morgan** (Progressive) — Champion of equality; social justice lens.
-- **Victor** (Conservative) — Guardian of order; tradition and stability.
-- **Skeptica** (Devil's Advocate) — Questions everything; skeptical view.
-- **Lens** (Bias Analyst) — Spots the spin; media bias and framing.
-- **Verify** (Fact-Checker) — Evidence only; verifies claims and sources.
-- **Bridge** (Synthesizer) — Finds common ground; objective synthesis.
-- **Terra** (Pragmatist) — Real-world impact; practical implications.
+| Folder | Purpose |
+|--------|---------|
+| [`frontend/`](frontend/) | Next.js 14 app — UI, `/api/analyze`, `/api/fetch-news`, `/api/extension-analyze` |
+| [`backend/`](backend/) | Placeholder for a future standalone API (see `backend/README.md`) |
+| [`extension/`](extension/) | Chrome extension (bias + reliability via your deployed site) |
+| [`docs/`](docs/) | Documentation (e.g. system flow) |
 
-## Setup
-
-1. **Install dependencies**
-   ```bash
-   npm install --legacy-peer-deps
-   ```
-
-2. **Environment variables**  
-   Create `.env.local` with:
-   - `OPENAI_API_KEY` — OpenAI API key (required for analysis)
-   - `SUPABASE_URL` / `SUPABASE_KEY` — Optional; for saving analysis history
-   - `FACTCHECK_API_KEY` — Optional; for future fact-check API use
-
-3. **Supabase (optional)**  
-   To store analysis history, run `supabase-migration.sql` in the Supabase SQL Editor to create the `analyses` table.
-
-## Run
+## Quick start
 
 ```bash
+cd frontend
+npm install --legacy-peer-deps
+cp .env.example .env.local   # add GEMINI_API_KEY
 npm run dev
 ```
 
-Open http://localhost:3000, paste a news article URL, and click **Analyze**. The Host sets the focus, then each panelist speaks in order. The result shows a **Credibility Score** (0–100, color-coded), a **Bias Meter** (Left–Center–Right with confidence), and a **Final summary**.
+Or from the repo root:
 
-## Tech stack
+```bash
+npm run install:all
+cd frontend && cp .env.example .env.local   # edit with your keys
+npm run dev
+```
 
-- Next.js 14 (App Router)
-- OpenAI API (GPT)
-- Cheerio (URL content extraction)
-- Supabase (optional history)
-- Tailwind CSS
+Open **http://localhost:3000**.
+
+## Vercel
+
+Set the project **Root Directory** to **`frontend`** so builds use `frontend/package.json`.
+
+## Environment
+
+See [`frontend/.env.example`](frontend/.env.example) — `GEMINI_API_KEY` is required for analysis.
+
+## Ad Fontes data
+
+Outlet baselines ship with the app as [`frontend/src/data/ad-fontes-media.csv`](frontend/src/data/ad-fontes-media.csv). A copy of the source chart CSV may also live under `docs/` for reference.

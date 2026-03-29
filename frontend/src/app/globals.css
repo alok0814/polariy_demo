@@ -14,11 +14,14 @@
   --text2: #5A5850;
   --text3: #9A9890;
   /* Ad Fontes scale */
-  --far-left: #93C5FD;
-  --left: #3B82F6;
-  --centrist: #64748B;
+  --far-left: #BFDBFE;
+  --left: #2563EB;
+  --centrist: #94A3B8;
   --right: #FCA5A5;
-  --far-right: #DC2626;
+  --far-right: #B91C1C;
+  --bias-deep-left: #1B4FCC;
+  --bias-center: #888888;
+  --bias-deep-right: #D72638;
   --accent-blue: #2563EB;
   --accent-red: #B91C1C;
   --accent-brown: #8B4512;
@@ -31,11 +34,9 @@
   /* panel accents */
   --progressive: #15803D;
   --conservative: #1D4ED8;
-  --devil: #7C3AED;
   --bias: #B45309;
   --fact: #0D9488;
   --synthesizer: #BE185D;
-  --pragmatist: #64748B;
   --muted: var(--text3);
 }
 

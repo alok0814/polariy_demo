@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { AGENTS, FACILITATOR } from "@/lib/agents";
 import { supabase } from "@/lib/supabase";
-
-const MODEL = "gpt-4o-mini";
+import { generateGeminiText } from "@/lib/gemini";
+import {
+  blendReliabilityAndHorizontal,
+  findOutletByUrl,
+  horizontalToBiasCategory,
+  type AdFontesRow,
+} from "@/lib/adFontesCsv";
 
 function buildFacilitatorPrompt(news: { title: string; url: string }) {
   return `${FACILITATOR.systemPrompt}
@@ -58,10 +62,11 @@ function parseSummaryAndScore(rawText: string): { text: string; summary: string;
   return { text, summary, score };
 }
 
-function get429RetryDelayMs(err: unknown): number | null {
-  const errAny = err as { status?: number; response?: { status?: number } };
-  if (errAny?.status === 429 || errAny?.response?.status === 429) return 60000;
-  return null;
+function parseHorizontalEstimate(text: string): number | null {
+  const m = text.match(/HORIZONTAL_ESTIMATE:\s*(-?\d+)/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return Math.min(42, Math.max(-42, n));
 }
 
 export async function POST(request: NextRequest) {
@@ -73,33 +78,37 @@ export async function POST(request: NextRequest) {
       body: string;
     };
     const { url, title, description, body: newsBody } = body;
-    if (!url || !newsBody) {
-      return NextResponse.json(
-        { error: "URL と本文が必要です" },
-        { status: 400 }
-      );
+    if (!newsBody?.trim()) {
+      return NextResponse.json({ error: "Article body is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY が設定されていません" },
-        { status: 500 }
-      );
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: "GEMINI_API_KEY is not set" }, { status: 500 });
     }
 
-    const openai = new OpenAI({ apiKey });
-    const news = { url, title: title || "", description: description || "", body: newsBody };
-    const replies: { agentId: string; name: string; shortName: string; color: string; text: string; summary: string; score: number | null }[] = [];
+    const articleUrl = (url && url.trim()) || "paste://article";
+    const outletRow: AdFontesRow | null = findOutletByUrl(articleUrl);
+
+    const news = {
+      url: articleUrl,
+      title: title || "",
+      description: description || "",
+      body: newsBody,
+    };
+    const replies: {
+      agentId: string;
+      name: string;
+      shortName: string;
+      color: string;
+      text: string;
+      summary: string;
+      score: number | null;
+    }[] = [];
     const previousReplies: { name: string; text: string }[] = [];
 
     let facilitatorReminder = `Focus on the article's claims, evidence, and fairness. No tangents.`;
     try {
-      const facCompletion = await openai.chat.completions.create({
-        model: MODEL,
-        messages: [{ role: "user", content: buildFacilitatorPrompt(news) }],
-      });
-      const facText = facCompletion.choices[0]?.message?.content?.trim() ?? "";
+      const facText = await generateGeminiText(buildFacilitatorPrompt(news));
       if (facText.length > 0) facilitatorReminder = facText.slice(0, 400);
     } catch {
       // keep default reminder
@@ -108,33 +117,14 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < AGENTS.length; i++) {
       const agent = AGENTS[i];
       const prompt = buildPrompt(i, news, previousReplies, facilitatorReminder);
-
-      const maxRetries = 3;
-      let lastError: unknown;
       let text = "";
-
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          const completion = await openai.chat.completions.create({
-            model: MODEL,
-            messages: [{ role: "user", content: prompt }],
-          });
-          text = completion.choices[0]?.message?.content?.trim() ?? "";
-          break;
-        } catch (err: unknown) {
-          lastError = err;
-          const delayMs = get429RetryDelayMs(err);
-          if (delayMs !== null && attempt < maxRetries - 1) {
-            await new Promise((r) => setTimeout(r, delayMs));
-            continue;
-          }
-          throw err;
-        }
+      try {
+        text = await generateGeminiText(prompt);
+      } catch (e) {
+        text = e instanceof Error ? `(Error: ${e.message})` : "(Failed to get analysis.)";
       }
 
-      const displayText =
-        text || (lastError instanceof Error ? `(Error: ${lastError.message})` : "(Failed to get analysis.)");
-      const { text: bodyText, summary, score } = parseSummaryAndScore(displayText);
+      const { text: bodyText, summary, score } = parseSummaryAndScore(text);
 
       replies.push({
         agentId: agent.id,
@@ -145,10 +135,16 @@ export async function POST(request: NextRequest) {
         summary: summary || bodyText.slice(0, 200),
         score,
       });
-      previousReplies.push({ name: agent.name, text: displayText });
+      previousReplies.push({ name: agent.name, text });
     }
 
+    const baselineNote = outletRow
+      ? `Ad Fontes chart baseline for outlet "${outletRow.newsSource}": vertical (reliability) rank ${outletRow.verticalRank}/64, horizontal (bias) rank ${outletRow.horizontalRank} (negative = left, positive = right). Use this as a strong prior but adjust for this specific article.`
+      : "No matching outlet in the Ad Fontes chart — infer bias and credibility from the article text and panel discussion only.";
+
     const finalPrompt = `You are summarizing a multi-perspective debate on a news article and producing metrics.
+
+${baselineNote}
 
 Each analyst's position:
 ${replies.map((r) => `- ${r.name}: ${r.summary} | Score: ${r.score ?? "—"}/10`).join("\n")}
@@ -156,32 +152,33 @@ ${replies.map((r) => `- ${r.name}: ${r.summary} | Score: ${r.score ?? "—"}/10`
 Output the following in English, using EXACTLY this format (one value per line):
 
 CREDIBILITY_SCORE: (integer 0-100; how trustworthy/credible is this news overall based on the debate? 100 = very credible, 0 = not credible)
-BIAS_POSITION: (exactly one of: Far Left | Left | Center-Left | Center | Center-Right | Right | Far Right)
-BIAS_CONFIDENCE: (integer 0-100; how confident is this bias assessment in percent)
+HORIZONTAL_ESTIMATE: (integer from -42 to +42 only; negative = left bias, positive = right bias, 0 = center)
+BIAS_CONFIDENCE: (integer 0-100; confidence in the bias estimate)
 FINAL_SUMMARY:
 (2-4 sentences in English summarizing the debate outcome and whether the news is reliable, balanced, and what the main takeaways are)`;
 
     let finalSummary = "";
-    let credibilityScore: number | null = null;
-    let biasPosition = "Center";
+    let aiCredibility: number | null = null;
+    let aiHorizontal: number | null = null;
     let biasConfidence: number | null = null;
     try {
-      const finalCompletion = await openai.chat.completions.create({
-        model: MODEL,
-        messages: [{ role: "user", content: finalPrompt }],
-      });
-      const finalText = finalCompletion.choices[0]?.message?.content?.trim() ?? "";
+      const finalText = await generateGeminiText(finalPrompt);
       const credMatch = finalText.match(/CREDIBILITY_SCORE:\s*(\d+)/i);
-      const posMatch = finalText.match(/BIAS_POSITION:\s*(Far Left|Left|Center-Left|Center|Center-Right|Right|Far Right)/i);
       const confMatch = finalText.match(/BIAS_CONFIDENCE:\s*(\d+)/i);
       const summaryMatch = finalText.match(/FINAL_SUMMARY:\s*([\s\S]+?)(?=\n\n|$)/i);
-      if (credMatch) credibilityScore = Math.min(100, Math.max(0, parseInt(credMatch[1], 10)));
-      if (posMatch) biasPosition = posMatch[1].trim();
+      if (credMatch) aiCredibility = Math.min(100, Math.max(0, parseInt(credMatch[1], 10)));
+      const hEst = parseHorizontalEstimate(finalText);
+      if (hEst !== null) aiHorizontal = hEst;
       if (confMatch) biasConfidence = Math.min(100, Math.max(0, parseInt(confMatch[1], 10)));
       finalSummary = summaryMatch ? summaryMatch[1].trim() : finalText.slice(0, 600);
     } catch {
       finalSummary = replies.map((r) => `${r.name}: ${r.summary}`).join(". ");
     }
+
+    const credAi = aiCredibility ?? 50;
+    const horizAi = aiHorizontal ?? 0;
+    const blended = blendReliabilityAndHorizontal(outletRow, credAi, horizAi);
+    const biasCategory = horizontalToBiasCategory(blended.horizontal);
 
     if (supabase) {
       await supabase.from("analyses").insert({
@@ -196,16 +193,22 @@ FINAL_SUMMARY:
       title: news.title,
       replies,
       finalSummary,
-      credibilityScore: credibilityScore ?? 50,
-      biasPosition,
+      credibilityScore: blended.reliability,
+      horizontalRank: blended.horizontal,
+      biasCategory,
+      biasPosition: biasCategory,
       biasConfidence: biasConfidence ?? 50,
+      outletBaseline: outletRow
+        ? {
+            name: outletRow.newsSource,
+            verticalRank: outletRow.verticalRank,
+            horizontalRank: outletRow.horizontalRank,
+          }
+        : null,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
     console.error("analyze error", e);
-    return NextResponse.json(
-      { error: `分析に失敗しました: ${message}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: `Analysis failed: ${message}` }, { status: 500 });
   }
 }
